@@ -6,6 +6,8 @@ import RehypeKatex from "rehype-katex";
 import RemarkGfm from "remark-gfm";
 import RehypeRaw from "rehype-raw";
 import RehypeHighlight from "rehype-highlight";
+import rehypeSanitize from "rehype-sanitize";
+import { defaultSchema } from "rehype-sanitize";
 import { useRef, useState, RefObject, useEffect, useMemo } from "react";
 import { copyToClipboard, useWindowSize } from "../utils";
 import mermaid from "mermaid";
@@ -28,17 +30,20 @@ const { Panel } = Collapse;
 interface ThinkCollapseProps {
   title: string | React.ReactNode;
   children: React.ReactNode;
-  className?: string; // className 通常是可选的
+  className?: string;
+  fontSize?: number;
 }
 const ThinkCollapse = styled(
-  ({ title, children, className }: ThinkCollapseProps) => {
+  ({ title, children, className, fontSize }: ThinkCollapseProps) => {
     // 如果是 Thinking 状态，默认展开，否则折叠
     const defaultActive = title === Locale.NewChat.Thinking ? ["1"] : [];
+    // 如果是 NoThink 状态，禁用
+    const disabled = title === Locale.NewChat.NoThink;
     const [activeKeys, setActiveKeys] = useState(defaultActive);
 
-    // 当标题从 Thinking 变为 Think 时自动折叠
+    // 当标题从 Thinking 变为 Think 或 NoThink 时自动折叠
     useEffect(() => {
-      if (title === Locale.NewChat.Think) {
+      if (title === Locale.NewChat.Think || title === Locale.NewChat.NoThink) {
         setActiveKeys([]);
       } else if (title === Locale.NewChat.Thinking) {
         setActiveKeys(["1"]);
@@ -47,10 +52,11 @@ const ThinkCollapse = styled(
 
     return (
       <Collapse
-        className={className}
+        className={`${className} ${disabled ? "disabled" : ""}`}
         size="small"
         activeKey={activeKeys}
-        onChange={(keys) => setActiveKeys(keys as string[])}
+        onChange={(keys) => !disabled && setActiveKeys(keys as string[])}
+        bordered={false}
       >
         <Panel header={title} key="1">
           {children}
@@ -58,46 +64,63 @@ const ThinkCollapse = styled(
       </Collapse>
     );
   },
-)`
+)<{ fontSize?: number }>`
   .ant-collapse-item {
-    border: none !important;
-    border-radius: 6px !important;
-    background-color: #fff !important;
+    border: var(--border-in-light) !important;
+    border-radius: 10px !important;
+    background-color: var(--white) !important;
+    margin-bottom: 8px !important;
   }
 
   .ant-collapse-header {
-    color: #333 !important;
+    color: var(--black) !important;
     font-weight: bold !important;
-    font-size: 14px !important;
+    font-size: ${(props) => props.fontSize ?? 14}px !important;
     padding: 6px 12px !important;
     align-items: center !important;
+    transition: all 0.3s ease !important;
 
     .ant-collapse-expand-icon {
-      color: #4a90e2 !important;
+      color: var(--primary) !important;
     }
   }
 
   .ant-collapse-content {
     background-color: transparent !important;
-    border-top: 1px solid #f0f0f0 !important;
+    border-top: 1px solid var(--border-in-light) !important;
 
     .ant-collapse-content-box {
       padding: 8px 12px !important;
-      font-size: 14px;
-      color: #666;
+      font-size: ${(props) => props.fontSize ?? 14}px;
+      color: var(--black);
+      opacity: 0.8;
     }
   }
 
-  .ant-collapse-item:hover {
-    background-color: #f8f9fa !important;
-  }
-
-  .ant-collapse-item-active {
+  &.disabled {
+    opacity: 0.9;
+    pointer-events: none;
+    .ant-collapse-item {
+      border: none !important;
+      background-color: transparent !important;
+    }
     .ant-collapse-header {
-      border-bottom: none;
+      padding: 6px 0px !important;
     }
   }
 `;
+
+// 配置安全策略，允许 thinkcollapse 标签，防止html注入造成页面崩溃
+const sanitizeOptions = {
+  ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames || []), "thinkcollapse"],
+  attributes: {
+    ...defaultSchema.attributes,
+    thinkcollapse: ["title", "className"],
+    pre: ["className"],
+    code: ["className"],
+  },
+};
 
 function Details(props: { children: React.ReactNode }) {
   return <details>{props.children}</details>;
@@ -441,6 +464,10 @@ function formatThinkText(text: string): string {
   const pattern = /^<think>([\s\S]*?)<\/think>/;
   return text.replace(pattern, (match, thinkContent) => {
     // 渲染为"思考完成"状态
+    // 如果 thinkContent 为空，则渲染为"没有思考过程"状态
+    if (thinkContent.trim() === "") {
+      return `<thinkcollapse title="${Locale.NewChat.NoThink}">\n</thinkcollapse>`;
+    }
     return `<thinkcollapse title="${Locale.NewChat.Think}">\n${thinkContent}\n</thinkcollapse>`;
   });
 }
@@ -466,7 +493,7 @@ function tryWrapHtmlCode(text: string) {
     );
 }
 
-function R_MarkDownContent(props: { content: string }) {
+function R_MarkDownContent(props: { content: string; fontSize?: number }) {
   const escapedContent = useMemo(() => {
     return tryWrapHtmlCode(
       formatThinkText(
@@ -480,6 +507,7 @@ function R_MarkDownContent(props: { content: string }) {
       remarkPlugins={[RemarkMath, RemarkGfm, RemarkBreaks]}
       rehypePlugins={[
         RehypeRaw,
+        [rehypeSanitize, sanitizeOptions],
         RehypeKatex,
         [
           RehypeHighlight,
@@ -500,7 +528,11 @@ function R_MarkDownContent(props: { content: string }) {
           }: {
             title: string;
             children: React.ReactNode;
-          }) => <ThinkCollapse title={title}>{children}</ThinkCollapse>,
+          }) => (
+            <ThinkCollapse title={title} fontSize={props.fontSize}>
+              {children}
+            </ThinkCollapse>
+          ),
           a: (aProps: any) => {
             const href = aProps.href || "";
             if (/\.(aac|mp3|opus|wav)$/.test(href)) {
@@ -518,7 +550,7 @@ function R_MarkDownContent(props: { content: string }) {
               );
             }
             const isInternal = /^\/#/i.test(href);
-            const target = isInternal ? "_self" : (aProps.target ?? "_blank");
+            const target = isInternal ? "_self" : aProps.target ?? "_blank";
             return <a {...aProps} target={target} />;
           },
           details: Details,
@@ -558,7 +590,7 @@ export function Markdown(
       {props.loading ? (
         <LoadingIcon />
       ) : (
-        <MarkdownContent content={props.content} />
+        <MarkdownContent content={props.content} fontSize={props.fontSize} />
       )}
     </div>
   );
