@@ -50,18 +50,39 @@ const ThinkCollapse = styled(
       }
     }, [title]);
 
+    const toggleCollapse = () => {
+      if (!disabled) {
+        setActiveKeys(activeKeys.length ? [] : ["1"]);
+      }
+    };
+
+    const handleRightClick = (e: React.MouseEvent) => {
+      e.preventDefault();
+      toggleCollapse();
+    };
+
+    const handleDoubleClick = () => {
+      toggleCollapse();
+    };
+
     return (
-      <Collapse
-        className={`${className} ${disabled ? "disabled" : ""}`}
-        size="small"
-        activeKey={activeKeys}
-        onChange={(keys) => !disabled && setActiveKeys(keys as string[])}
-        bordered={false}
+      <div
+        onContextMenu={handleRightClick}
+        onDoubleClick={handleDoubleClick}
+        className={className}
       >
-        <Panel header={title} key="1">
-          {children}
-        </Panel>
-      </Collapse>
+        <Collapse
+          className={`${disabled ? "disabled" : ""}`}
+          size="small"
+          activeKey={activeKeys}
+          onChange={(keys) => !disabled && setActiveKeys(keys as string[])}
+          bordered={false}
+        >
+          <Panel header={title} key="1">
+            {children}
+          </Panel>
+        </Collapse>
+      </div>
     );
   },
 )<{ fontSize?: number }>`
@@ -480,9 +501,9 @@ function formatThinkText(text: string): string {
     // 渲染为"思考完成"状态
     // 如果 thinkContent 为空，则渲染为"没有思考过程"状态
     if (thinkContent.trim() === "") {
-      return `<thinkcollapse title="${Locale.NewChat.NoThink}">\n</thinkcollapse>`;
+      return `<thinkcollapse title="${Locale.NewChat.NoThink}">\n</thinkcollapse>\n`;
     }
-    return `<thinkcollapse title="${Locale.NewChat.Think}">\n${thinkContent}\n</thinkcollapse>`;
+    return `<thinkcollapse title="${Locale.NewChat.Think}">\n${thinkContent}\n\n</thinkcollapse>\n`;
   });
 }
 
