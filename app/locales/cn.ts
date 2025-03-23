@@ -1,6 +1,3 @@
-import Title from "antd/es/skeleton/Title";
-import { ShortcutKeyModal } from "../components/chat";
-import { SearchChatPage } from "../components/search-chat";
 import { getClientConfig } from "../config/client";
 import { SubmitKey } from "../store/config";
 
@@ -145,7 +142,7 @@ const cn = {
     Typing: "正在输入…",
     Input: (submitKey: string, isMobileScreen: boolean = false) => {
       if (isMobileScreen) {
-        return "@ 选择模型，/ 触发预设，: 触发命令\n输入你的问题...";
+        return "/ 触发预设，: 触发命令\n输入你的问题...";
       }
       var inputHints = `${submitKey} 发送`;
       if (submitKey === String(SubmitKey.Enter)) {
@@ -238,13 +235,19 @@ const cn = {
     Danger: {
       Reset: {
         Title: "重置所有设置",
-        SubTitle: "重置所有设置项回默认值",
+        SubTitle: "重置所有设置项回默认值（不包含聊天数据）",
         Action: "立即重置",
         Confirm: "确认重置所有设置？",
       },
-      Clear: {
-        Title: "清除所有数据",
-        SubTitle: "清除所有聊天、设置数据",
+      ClearChat: {
+        Title: "清除聊天数据",
+        SubTitle: "清除所有聊天数据（不包含设置）",
+        Action: "立即清除",
+        Confirm: "确认清除所有聊天数据？",
+      },
+      ClearALL: {
+        Title: "清除所有数据及设置",
+        SubTitle: "清除所有聊天、设置数据，恢复到初始状态",
         Action: "立即清除",
         Confirm: "确认清除所有聊天、设置数据？",
       },

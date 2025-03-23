@@ -151,7 +151,7 @@ const en: LocaleType = {
     Typing: "Typing…",
     Input: (submitKey: string, isMobileScreen: boolean = false) => {
       if (isMobileScreen) {
-        return "@ to select models,/ to search prompts, : to use commands\nInput your question...";
+        return "/ to search prompts, : to use commands\nInput your question...";
       }
       var inputHints = `${submitKey} to send`;
       if (submitKey === String(SubmitKey.Enter)) {
@@ -248,9 +248,15 @@ const en: LocaleType = {
         Action: "Reset",
         Confirm: "Confirm to reset all settings to default?",
       },
-      Clear: {
+      ClearChat: {
+        Title: "Clear Chat History",
+        SubTitle: "Clear all chat history and keep settings",
+        Action: "Clear",
+        Confirm: "Confirm to clear all chat history?",
+      },
+      ClearALL: {
         Title: "Clear All Data",
-        SubTitle: "Clear all messages and settings",
+        SubTitle: "Clear all chat history and settings to empty state",
         Action: "Clear",
         Confirm: "Confirm to clear all messages and settings?",
       },
