@@ -65,6 +65,7 @@ const en: LocaleType = {
       search: "Search Chat",
       edit: "Edit Chat",
       resend: "Resend Chat",
+      private: "Switch Private Mode",
     },
     InputActions: {
       Stop: "Stop",
@@ -73,6 +74,13 @@ const en: LocaleType = {
         auto: "Auto",
         light: "Light Theme",
         dark: "Dark Theme",
+      },
+      PrivateMode: {
+        On: "Open Private Mode",
+        OnToast:
+          "Private mode is now enabled, and a new private session has been created.",
+        Off: "Close Private Mode",
+        Info: "In Private Mode Currently",
       },
       ModelAtSelector: {
         SelectModel: "Select Model",
@@ -178,6 +186,8 @@ const en: LocaleType = {
       copyLastCode: "Copy Last Code Block",
       resendLastMessage: "Resend Last Message",
       showShortcutKey: "Show Shortcuts",
+      moveCursorToStart: "Move Cursor to Start",
+      moveCursorToEnd: "Move Cursor to End",
       searchChat: "Search Chat History",
     },
   },
@@ -554,6 +564,7 @@ const en: LocaleType = {
   },
   Store: {
     DefaultTopic: "New Conversation",
+    PrivateTopic: "Temporary Chat Window, Records Not Saved",
     BotHello: "Hello! How can I assist you today?",
     Error: "Something went wrong, please try again later.",
     Prompt: {

@@ -62,6 +62,7 @@ const cn = {
       search: "搜索聊天",
       edit: "编辑最后一条用户聊天",
       resend: "重新获取 AI 回复",
+      private: "切换无痕状态（新建/退出）",
     },
     InputActions: {
       Stop: "停止响应",
@@ -71,14 +72,20 @@ const cn = {
         light: "亮色模式",
         dark: "深色模式",
       },
+      PrivateMode: {
+        On: "开启无痕模式",
+        OnToast: "已开启无痕模式，已创建新的无痕会话",
+        Off: "关闭无痕模式",
+        Info: "当前处于无痕模式\n对话阅后即焚",
+      },
       ModelAtSelector: {
         SelectModel: "选择模型",
         AvailableModels: (count: number | undefined) =>
           `${count ?? 0} 个可用模型`,
         NoAvailableModels: "没有找到匹配的模型",
       },
-      MoveCursorToStart: "双击跳转至段首",
-      MoveCursorToEnd: "双击跳转至段尾",
+      MoveCursorToStart: "Ctrl+Shift+Left 跳转至段首",
+      MoveCursorToEnd: "Ctrl+Shift+Right 跳转至段尾",
       Prompt: "快捷指令",
       Masks: "所有面具",
       Clear: "清除聊天",
@@ -169,6 +176,8 @@ const cn = {
       copyLastCode: "复制最后一个代码块",
       resendLastMessage: "重试最后一个提问",
       showShortcutKey: "显示快捷方式",
+      moveCursorToStart: "跳转至段首",
+      moveCursorToEnd: "跳转至段尾",
       searchChat: "搜索聊天记录",
     },
   },
@@ -539,6 +548,7 @@ const cn = {
   },
   Store: {
     DefaultTopic: "新的聊天",
+    PrivateTopic: "临时对话窗口，记录不保存",
     BotHello: "你好！有什么需要我帮忙的吗？😎",
     Error: "出错了，稍后重试吧",
     Prompt: {

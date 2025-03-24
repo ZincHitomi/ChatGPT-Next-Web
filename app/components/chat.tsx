@@ -49,6 +49,7 @@ import ReloadIcon from "../icons/reload.svg";
 import TranslateIcon from "../icons/translate.svg";
 import OcrIcon from "../icons/ocr.svg";
 import PrivacyIcon from "../icons/privacy.svg";
+import PrivacyModeIcon from "../icons/incognito.svg";
 import UploadDocIcon from "../icons/upload-doc.svg";
 
 import {
@@ -888,7 +889,22 @@ export function ChatActions(props: {
             });
           }}
         />
-
+        <ChatAction
+          text={
+            !session?.inPrivateMode
+              ? Locale.Chat.InputActions.PrivateMode.On
+              : Locale.Chat.InputActions.PrivateMode.Off
+          }
+          icon={<PrivacyModeIcon />}
+          onClick={() => {
+            if (!session?.inPrivateMode) {
+              chatStore.newSession(undefined, true);
+              showToast(Locale.Chat.InputActions.PrivateMode.OnToast);
+            } else {
+              chatStore.deleteSession(chatStore.currentSessionIndex);
+            }
+          }}
+        />
         <ChatAction
           onClick={() => setShowModelSelector(true)}
           alwaysShowText={true}
@@ -1080,6 +1096,14 @@ export function ShortcutKeyModal(props: { onClose: () => void }) {
       keys: isMac ? ["⌘", "/"] : ["Ctrl", "/"],
     },
     {
+      title: Locale.Chat.ShortcutKey.moveCursorToStart,
+      keys: isMac ? ["⌘", "Shift", "Left"] : ["Ctrl", "Shift", "Left"],
+    },
+    {
+      title: Locale.Chat.ShortcutKey.moveCursorToEnd,
+      keys: isMac ? ["⌘", "Shift", "Right"] : ["Ctrl", "Shift", "Right"],
+    },
+    {
       title: Locale.Chat.ShortcutKey.searchChat,
       keys: isMac ? ["⌘", "Alt", "F"] : ["Ctrl", "Alt", "F"],
     },
@@ -1154,7 +1178,7 @@ function ChatInputActions(props: {
   } = props;
 
   return (
-    <div className={styles["chat-input-actions"]}>
+    <div className={styles["message-actions-row"]}>
       {message.streaming ? (
         <ChatAction
           text={Locale.Chat.Actions.Stop}
@@ -1175,11 +1199,11 @@ function ChatInputActions(props: {
             onClick={() => onDelete(message.id ?? i)}
           />
 
-          <ChatAction
+          {/* <ChatAction
             text={Locale.Chat.Actions.Pin}
             icon={<PinIcon />}
             onClick={() => onPinMessage(message)}
-          />
+          /> */}
           <ChatAction
             text={Locale.Chat.Actions.Copy}
             icon={<CopyIcon />}
@@ -1362,6 +1386,14 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
     next: () => chatStore.nextSession(1),
     fork: () => chatStore.forkSession(),
     del: () => chatStore.deleteSession(chatStore.currentSessionIndex),
+    private: () => {
+      if (!chatStore.sessions[chatStore.currentSessionIndex]?.inPrivateMode) {
+        chatStore.newSession(undefined, true);
+        showToast(Locale.Chat.InputActions.PrivateMode.OnToast);
+      } else {
+        chatStore.deleteSession(chatStore.currentSessionIndex);
+      }
+    },
   });
 
   // only search prompts when user input is short
@@ -1546,6 +1578,30 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
       } else if (e.key === "Escape") {
         e.preventDefault();
         setShowModelAtSelector(false);
+      }
+      return;
+    }
+    if (e.ctrlKey && e.shiftKey) {
+      const textarea = inputRef.current;
+      if (!textarea) return;
+
+      if (e.key === "ArrowLeft") {
+        // Ctrl+Shift+左箭头：跳转到段首
+        e.preventDefault();
+        textarea.setSelectionRange(0, 0);
+        textarea.focus();
+        textarea.scrollTop = 0;
+        showToast(Locale.Chat.InputActions.MoveCursorToStart);
+      } else if (e.key === "ArrowRight") {
+        // Ctrl+Shift+右箭头：跳转到段尾
+        e.preventDefault();
+        textarea.setSelectionRange(
+          textarea.value.length,
+          textarea.value.length,
+        );
+        textarea.focus();
+        textarea.scrollTop = textarea.scrollHeight;
+        showToast(Locale.Chat.InputActions.MoveCursorToEnd);
       }
       return;
     }
@@ -1917,25 +1973,6 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 双击处理函数
-  const [cursorAtStart, setCursorAtStart] = useState(false);
-  const handleDoubleClick = () => {
-    const textarea = inputRef.current;
-    if (!textarea) return;
-    if (cursorAtStart) {
-      // 如果光标在起点，则移动到结尾
-      textarea.setSelectionRange(userInput.length, userInput.length);
-      setCursorAtStart(false);
-      showToast(Locale.Chat.InputActions.MoveCursorToEnd);
-    } else {
-      // 如果光标不在起点，则移动到起点
-      textarea.setSelectionRange(0, 0);
-      setCursorAtStart(true);
-      showToast(Locale.Chat.InputActions.MoveCursorToStart);
-    }
-    // 保持焦点
-    textarea.focus();
-  };
   const handlePaste = useCallback(
     async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
       const currentModel = chatStore.currentSession().mask.modelConfig.model;
@@ -2590,7 +2627,7 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
 
                     {iconUpEnabled && showActions && (
                       <div className={styles["chat-message-actions"]}>
-                        <div className={styles["chat-input-actions"]}>
+                        <div className={styles["message-actions-row"]}>
                           <ChatInputActions
                             message={message}
                             onUserStop={onUserStop}
@@ -2717,7 +2754,7 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
                   </div>
                   {iconDownEnabled && showActions && (
                     <div className={styles["chat-message-actions"]}>
-                      <div className={styles["chat-input-actions"]}>
+                      <div className={styles["message-actions-row"]}>
                         <ChatInputActions
                           message={message}
                           onUserStop={onUserStop}
@@ -2855,7 +2892,6 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
             onKeyDown={onInputKeyDown}
             // onFocus={scrollToBottom}
             onClick={scrollToBottom}
-            onDoubleClick={handleDoubleClick}
             onPaste={handlePaste}
             rows={inputRows}
             autoFocus={autoFocus}
