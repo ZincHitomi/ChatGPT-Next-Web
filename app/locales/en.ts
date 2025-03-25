@@ -68,6 +68,8 @@ const en: LocaleType = {
       private: "Switch Private Mode",
     },
     InputActions: {
+      Collapse: "Fold Ribbon",
+      Expand: "Expand Ribbon",
       Stop: "Stop",
       ToBottom: "To Latest",
       Theme: {
@@ -81,6 +83,7 @@ const en: LocaleType = {
           "Private mode is now enabled, and a new private session has been created.",
         Off: "Close Private Mode",
         Info: "In Private Mode Currently",
+        Return: "↩ Back to Chat Page",
       },
       ModelAtSelector: {
         SelectModel: "Select Model",
@@ -144,10 +147,15 @@ const en: LocaleType = {
           "This privacy mosaic has been completed and replaced the input content.",
       },
       UploadFile: {
-        Title: "Upload Plain Text File",
+        Title: ((canUploadImage: boolean = false) =>
+          canUploadImage
+            ? "Upload Image or Plain Text File"
+            : "Upload Plain Text File") as any,
         FileTooLarge: "Only support to upload single file with 1M.",
         TooManyFile: "Exceeds the maximum number of files allowed for upload.",
         UnsupportedFileType: "Unsupported File Type.",
+        UnsupportToUploadImage:
+          "No image uploads for the model's lack of visual capabilities configuration.",
         FailToRead: "File content reading failed.",
         TooManyTokenToPasteAsFile:
           "The amount of text pasted is excessive; it has been automatically attached as a file.",
