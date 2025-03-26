@@ -63,6 +63,7 @@ const cn = {
       edit: "编辑最后一条用户聊天",
       resend: "重新获取 AI 回复",
       private: "切换无痕状态（新建/退出）",
+      pin: "置顶当前对话",
     },
     InputActions: {
       Collapse: "折叠功能区",
@@ -97,12 +98,20 @@ const cn = {
       UnsupportedModelForUploadImage: "当前模型不支持上传图片",
       RenameFile: "重命名文件",
       CloudBackup: "云备份",
+      Continue: {
+        Title: "继续补全",
+        isContinueToast: "正在补全中...",
+        ContinuePrompt:
+          "请继续补充完整上文未完成的内容，保持思路和风格的连贯性，直接接续输出。不要重复已有内容，不要添加总结或开场白。根据内容类型（写作、解题、代码等）自动判断合理的结束点。",
+      },
       Translate: {
         Title: "中英互译",
         BlankToast: "输入内容为空，不执行本次翻译",
         isTranslatingToast: "正在翻译中...",
         FailTranslateToast: "本次翻译失败，无权限或请检查模型设置后再次尝试",
         SuccessTranslateToast: "本次翻译已结束并替换输入文本",
+        Undo: "撤销翻译",
+        UndoToast: "已撤销翻译",
         TranslatePrompt:
           "请担任中英文翻译官，请检查信息是否准确，请翻译得自然、流畅和地道，使用优美和高雅的表达方式。\
 文本可能由于复制问题导致冗余的段内换行和页码问题，请根据上下文智能去除。\
@@ -131,11 +140,13 @@ const cn = {
           "请帮我识别这张图片中的文字内容,按照上述规则输出结果，确保输出结果的准确性且没有多余内容。",
       },
       Privacy: {
-        Title: "隐私打码(不可撤销)",
+        Title: "隐私打码",
         BlankToast: "输入内容为空，不执行本次打码",
         isPrivacyToast: "正在打码中...",
         FailPrivacyToast: "本次打码失败，无权限或请检查模型设置后再次尝试",
         SuccessPrivacyToast: "本次打码已结束并替换输入内容",
+        Undo: "撤销隐私处理",
+        UndoToast: "已撤销隐私处理",
       },
       UploadFile: {
         Title: (canUploadImage: boolean = false) =>
@@ -224,6 +235,7 @@ const cn = {
     All: "选取全部",
     Latest: "最近几条",
     Clear: "清除选中",
+    HideUserContinueMsg: "过滤“继续补全”消息",
   },
   Memory: {
     Title: "历史摘要",
@@ -378,6 +390,15 @@ const cn = {
       EditModal: {
         Title: "编辑提示词",
       },
+      CustomUserContinuePrompt: {
+        Title: "自定义 “继续补全” 提示词",
+        SubTitle: "自定义补全会话的提示词，用于引导模型补全会话",
+        Enable: "显示“继续补全”对话框",
+        Edit: "编辑",
+        Modal: {
+          Title: "“继续补全”提示词",
+        },
+      },
     },
     HistoryCount: {
       Title: "附带历史消息数",
@@ -511,22 +532,27 @@ const cn = {
       SubTitle: "用于识别输入图片中的文本的模型",
     },
     Temperature: {
+      Param: "temperature",
       Title: "随机性 (temperature)",
       SubTitle: "值越大，回复越随机",
     },
     TopP: {
+      Param: "top_p",
       Title: "核采样 (top_p)",
       SubTitle: "与随机性类似，但不要和随机性一起更改",
     },
     MaxTokens: {
+      Param: "max_tokens",
       Title: "单次回复限制 (max_tokens)",
       SubTitle: "单次交互所用的最大 Token 数",
     },
     PresencePenalty: {
+      Param: "presence_penalty",
       Title: "话题新鲜度 (presence_penalty)",
       SubTitle: "值越大，越有可能扩展到新话题",
     },
     FrequencyPenalty: {
+      Param: "frequency_penalty",
       Title: "频率惩罚度 (frequency_penalty)",
       SubTitle: "值越大，越有可能降低重复字词",
     },
@@ -558,8 +584,10 @@ const cn = {
     Error: "出错了，稍后重试吧",
     Prompt: {
       History: (content: string) => "这是历史聊天总结作为前情提要：" + content,
-      Topic:
+      old_Topic:
         "使用四到五个字直接返回这句话的简要主题，不要解释、不要标点、不要语气词、不要多余文本，不要加粗，如果没有主题，请直接返回“闲聊”",
+      Topic:
+        "为上述的对话内容主题创建一个简洁的3~8个字的标题，并带有一个表情符号。适合的Emoji可以用来增强理解，但避免使用引号或特殊格式。标题格式为“emoji + 空格 + 标题描述”，语言跟随用户对话，注意控制字数。\n一些标题示例：\n📉 股市趋势\n🍪 完美巧克力饼干配方\n🎵 音乐流媒体演变\n🎮 电子游戏开发见解",
       Summarize:
         "简要总结一下对话内容，用作后续的上下文提示 prompt，控制在 200 字以内",
     },

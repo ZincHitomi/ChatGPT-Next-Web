@@ -33,6 +33,7 @@ import EditIcon from "../icons/rename.svg";
 import EditToInputIcon from "../icons/edit_input.svg";
 import ConfirmIcon from "../icons/confirm.svg";
 import CancelIcon from "../icons/cancel.svg";
+import ContinueIcon from "../icons/continue.svg";
 // import ImageIcon from "../icons/image.svg";
 
 // import LightIcon from "../icons/light.svg";
@@ -530,13 +531,56 @@ export function ChatActions(props: {
 
   // translate
   const [isTranslating, setIsTranslating] = useState(false);
+  const [originalTextForTranslate, setOriginalTextForTranslate] = useState<
+    string | null
+  >(null);
+  const [translatedText, setTranslatedText] = useState<string | null>(null);
   // ocr
   const [isOCRing, setIsOCRing] = useState(false);
   // privacy
   const [isPrivacying, setIsPrivacying] = useState(false);
+  const [originalTextForPrivacy, setOriginalTextForPrivacy] = useState<
+    string | null
+  >(null);
+  const [privacyProcessedText, setPrivacyProcessedText] = useState<
+    string | null
+  >(null);
+  // continue chat
+  const [isContinue, setIsContinue] = useState(false);
+  // model
   const { translateModel, ocrModel } = useAccessStore();
 
+  // 监听用户输入变化，如果输入改变则重置撤销状态
+  useEffect(() => {
+    // 当用户输入变化时，检查是否需要重置撤销状态
+    if (
+      originalTextForTranslate !== null &&
+      props.userInput.trim() !== translatedText?.trim()
+    ) {
+      // 如果当前输入与原始输入不同，则重置翻译的撤销状态
+      setOriginalTextForTranslate(null);
+      setTranslatedText(null);
+    }
+
+    if (
+      originalTextForPrivacy !== null &&
+      props.userInput.trim() !== privacyProcessedText
+    ) {
+      // 如果当前输入与经过隐私处理的原始输入不同，则重置隐私处理的撤销状态
+      setOriginalTextForPrivacy(null);
+      setPrivacyProcessedText(null);
+    }
+  }, [props.userInput]);
+
   const handleTranslate = async () => {
+    if (originalTextForTranslate !== null) {
+      // 执行撤销操作
+      props.setUserInput(originalTextForTranslate);
+      setOriginalTextForTranslate(null);
+      setTranslatedText(null);
+      showToast(Locale.Chat.InputActions.Translate.UndoToast);
+      return;
+    }
     if (props.userInput.trim() === "") {
       showToast(Locale.Chat.InputActions.Translate.BlankToast);
       return;
@@ -574,11 +618,20 @@ export function ChatActions(props: {
             showToast(Locale.Chat.InputActions.Translate.FailTranslateToast);
             return;
           }
+
+          let translatedContent: string;
           if (typeof message === "string") {
-            props.setUserInput(message);
+            translatedContent = message;
           } else {
-            props.setUserInput(message.content);
+            translatedContent = message.content;
           }
+          translatedContent = translatedContent || props.userInput; // 避免空翻译无法撤销
+
+          // 保存原始文本和翻译结果以便撤销
+          setOriginalTextForTranslate(props.userInput);
+          setTranslatedText(translatedContent);
+          props.setUserInput(translatedContent);
+
           showToast(Locale.Chat.InputActions.Translate.SuccessTranslateToast);
         } else {
           showToast(Locale.Chat.InputActions.Translate.FailTranslateToast);
@@ -659,6 +712,15 @@ export function ChatActions(props: {
     });
   };
   const handlePrivacy = async () => {
+    if (originalTextForPrivacy !== null) {
+      // 执行撤销操作
+      props.setUserInput(originalTextForPrivacy);
+      setOriginalTextForPrivacy(null);
+      setPrivacyProcessedText(null);
+      showToast(Locale.Chat.InputActions.Privacy.UndoToast);
+      return;
+    }
+
     if (props.userInput.trim() === "") {
       showToast(Locale.Chat.InputActions.Privacy.BlankToast);
       return;
@@ -666,7 +728,11 @@ export function ChatActions(props: {
     setIsPrivacying(true);
     showToast(Locale.Chat.InputActions.Privacy.isPrivacyToast);
     const markedText = maskSensitiveInfo(props.userInput);
+    // 保存原始文本以便撤销
+    setOriginalTextForPrivacy(props.userInput);
+    setPrivacyProcessedText(markedText);
     props.setUserInput(markedText);
+
     showToast(Locale.Chat.InputActions.Privacy.SuccessPrivacyToast);
     setIsPrivacying(false);
   };
@@ -721,6 +787,20 @@ export function ChatActions(props: {
 
     return maskedText;
   }
+  const handleContinueChat = async () => {
+    setIsContinue(true);
+    showToast(Locale.Chat.InputActions.Continue.isContinueToast);
+
+    const continuePrompt = config.customUserContinuePrompt
+      ? config.customUserContinuePrompt
+      : Locale.Chat.InputActions.Continue.ContinuePrompt;
+    chatStore
+      .onUserInput(continuePrompt, [], [], true)
+      .then(() => setIsContinue(false));
+    chatStore.setLastInput(continuePrompt);
+    setIsContinue(false);
+  };
+
   function isValidMessage(message: any): boolean {
     if (typeof message !== "string") {
       return false;
@@ -1030,11 +1110,17 @@ export function ChatActions(props: {
           }}
         />
         <ChatAction
+          text={Locale.Chat.InputActions.Continue.Title}
+          icon={<ContinueIcon />}
+          onClick={handleContinueChat}
+        />
+        <ChatAction
           text={
             !session?.inPrivateMode
               ? Locale.Chat.InputActions.PrivateMode.On
               : Locale.Chat.InputActions.PrivateMode.Off
           }
+          alwaysShowText={session?.inPrivateMode}
           icon={<PrivacyModeIcon />}
           onClick={() => {
             if (!session?.inPrivateMode) {
@@ -1120,11 +1206,13 @@ export function ChatActions(props: {
         <ChatAction
           onClick={handleTranslate}
           text={
-            isTranslating
+            originalTextForTranslate !== null
+              ? Locale.Chat.InputActions.Translate.Undo
+              : isTranslating
               ? Locale.Chat.InputActions.Translate.isTranslatingToast
               : Locale.Chat.InputActions.Translate.Title
           }
-          alwaysShowText={isTranslating}
+          alwaysShowText={isTranslating || originalTextForTranslate !== null}
           icon={<TranslateIcon />}
         />
         {!isMobileScreen && (
@@ -1142,11 +1230,13 @@ export function ChatActions(props: {
         <ChatAction
           onClick={handlePrivacy}
           text={
-            isPrivacying
+            originalTextForPrivacy !== null
+              ? Locale.Chat.InputActions.Privacy.Undo
+              : isPrivacying
               ? Locale.Chat.InputActions.Privacy.isPrivacyToast
               : Locale.Chat.InputActions.Privacy.Title
           }
-          alwaysShowText={isPrivacying}
+          alwaysShowText={isPrivacying || originalTextForPrivacy !== null}
           icon={<PrivacyIcon />}
         />
       </div>
@@ -1532,7 +1622,9 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
     clear: () =>
       chatStore.updateTargetSession(session, (session) => {
         session.clearContextIndex = session.messages.length;
-        session.messages[session.messages.length - 1].beClear = true;
+        if (session.clearContextIndex > 1) {
+          session.messages[session.messages.length - 1].beClear = true;
+        }
       }),
     new: () => chatStore.newSession(),
     search: () => navigate(Path.SearchChat),
@@ -1541,6 +1633,7 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
     next: () => chatStore.nextSession(1),
     fork: () => chatStore.forkSession(),
     del: () => chatStore.deleteSession(chatStore.currentSessionIndex),
+    pin: () => chatStore.pinSession(chatStore.currentSessionIndex),
     private: () => {
       if (!chatStore.sessions[chatStore.currentSessionIndex]?.inPrivateMode) {
         chatStore.newSession(undefined, true);
@@ -2661,13 +2754,17 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
       >
         {messages.map((message, i) => {
           const isUser = message.role === "user";
+          const shouldHideUserMessage =
+            isUser && message.isContinuePrompt === true;
+          if (!config.enableShowUserContinuePrompt && shouldHideUserMessage) {
+            return null;
+          }
           const isContext = i < context.length;
           const showActions =
             i > 0 &&
             !(message.preview || message.content.length === 0) &&
             !isContext;
           const showTyping = message.preview || message.streaming;
-
           const shouldShowClearContextDivider =
             i === clearContextIndex - 1 || message?.beClear === true;
           return (

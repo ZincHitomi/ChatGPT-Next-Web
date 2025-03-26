@@ -66,6 +66,7 @@ const en: LocaleType = {
       edit: "Edit Chat",
       resend: "Resend Chat",
       private: "Switch Private Mode",
+      pin: "Pin Current Session",
     },
     InputActions: {
       Collapse: "Fold Ribbon",
@@ -102,6 +103,12 @@ const en: LocaleType = {
         "Current model does not support image uploads.",
       RenameFile: "Rename this file",
       CloudBackup: "Backup by Cloud",
+      Continue: {
+        Title: "Complete Chat",
+        isContinueToast: "Currently completing chat...",
+        ContinuePrompt:
+          "Please continue to elaborate on the incomplete content above, maintaining a consistent train of thought and style. Proceed directly with the output without repeating existing information or adding summaries or introductions. Automatically determine a reasonable ending point based on the content type (writing, problem-solving, code, etc.).",
+      },
       Translate: {
         Title: "Translate between ZH-EN",
         BlankToast: "Input content is empty, no translation will be performed",
@@ -110,6 +117,8 @@ const en: LocaleType = {
           "This translation failed; please check the translation model settings and try again.",
         SuccessTranslateToast:
           "This translation has been completed and replaced the input text.",
+        Undo: "Undo Translate",
+        UndoToast: "Undo Translate Success",
         TranslatePrompt:
           "Please act as a Chinese-English interpreter, verify the accuracy of the information, and translate it naturally, fluently, and idiomatically, using beautiful and elegant expressions. The text may contain redundant line breaks within paragraphs and pagination issues due to copying problems, which should be intelligently removed in context. Regardless of what the other party replies, you should only translate the content. You should only respond with the translated content and not with any other information. Do not provide explanations. This is the content you need to translate: \n",
       },
@@ -137,7 +146,7 @@ const en: LocaleType = {
           "Please help me OCR this image, according to the above rules, and ensure the accuracy of the output results without any additional content.",
       },
       Privacy: {
-        Title: "Mosaic for Privacy Input, irreversible",
+        Title: "Privatize the input",
         BlankToast:
           "Input content is empty, no privacy mosaic will be performed",
         isPrivacyToast: "Currently privacy mosaic ...",
@@ -145,6 +154,8 @@ const en: LocaleType = {
           "This privacy mosaic failed; please check the privacy model settings and try again.",
         SuccessPrivacyToast:
           "This privacy mosaic has been completed and replaced the input content.",
+        Undo: "Undo Privatize",
+        UndoToast: "Undo Privatize Success",
       },
       UploadFile: {
         Title: ((canUploadImage: boolean = false) =>
@@ -237,6 +248,7 @@ const en: LocaleType = {
     All: "Select All",
     Latest: "Select Latest",
     Clear: "Clear",
+    HideUserContinueMsg: "Hide User Continue Msg",
   },
   Memory: {
     Title: "Memory Prompt",
@@ -392,6 +404,16 @@ const en: LocaleType = {
       EditModal: {
         Title: "Edit Prompt",
       },
+      CustomUserContinuePrompt: {
+        Title: "Prompt for AI Conversation Completion",
+        SubTitle:
+          "Custom prompt for conversation completion, used to guide the model in completing conversations",
+        Enable: "Show Continue Completion Message",
+        Edit: "Edit Prompt",
+        Modal: {
+          Title: "Continue Completion Prompt",
+        },
+      },
     },
     HistoryCount: {
       Title: "Attached Messages Count",
@@ -527,23 +549,28 @@ const en: LocaleType = {
       SubTitle: "Model used to extract text from input image",
     },
     Temperature: {
+      Param: "temperture",
       Title: "Temperature",
       SubTitle: "A larger value makes the more random output",
     },
     TopP: {
+      Param: "top_p",
       Title: "Top P",
       SubTitle: "Do not alter this value together with temperature",
     },
     MaxTokens: {
+      Param: "max_tokens",
       Title: "Max Tokens",
       SubTitle: "Maximum length of input tokens and generated tokens",
     },
     PresencePenalty: {
+      Param: "presence_penalty",
       Title: "Presence Penalty",
       SubTitle:
         "A larger value increases the likelihood to talk about new topics",
     },
     FrequencyPenalty: {
+      Param: "frequency_penalty",
       Title: "Frequency Penalty",
       SubTitle:
         "A larger value decreasing the likelihood to repeat the same line",
@@ -578,8 +605,10 @@ const en: LocaleType = {
     Prompt: {
       History: (content: string) =>
         "This is a summary of the chat history as a recap: " + content,
-      Topic:
+      old_Topic:
         "Please generate a four to five word title summarizing our conversation without any lead-in, punctuation, quotation marks, periods, symbols, bold text, or additional text. Remove enclosing quotation marks.",
+      Topic:
+        "Create a concise, 3-8 words title with an emoji as a title for the prompt in the given language. Suitable Emojis for the summary can be used to enhance understanding but avoid quotation marks or special formatting. RESPOND ONLY WITH THE TITLE TEXT.\nExamples of titles:\n📉 Stock Market Trends\n🍪 Perfect Chocolate Chip Recipe\n🎵 Evolution of Music Streaming\n🎮 Video Game Development Insights",
       Summarize:
         "Summarize the discussion briefly in 200 words or less to use as a prompt for future context.",
     },
