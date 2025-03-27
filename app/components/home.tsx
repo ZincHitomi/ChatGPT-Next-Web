@@ -30,6 +30,7 @@ import { getClientConfig } from "../config/client";
 import { ClientApi } from "../client/api";
 import { useAccessStore } from "../store";
 import { identifyDefaultClaudeModel } from "../utils/checkers";
+import { FloatingButton } from "./floating-button";
 
 export function Loading(props: { noLogo?: boolean }) {
   return (
@@ -234,6 +235,7 @@ export function Home() {
     <ErrorBoundary>
       <Router>
         <Screen />
+        <FloatingButton />
       </Router>
     </ErrorBoundary>
   );
