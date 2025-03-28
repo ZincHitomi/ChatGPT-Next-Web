@@ -141,10 +141,25 @@ function createTemplateRegex(output: string) {
 }
 
 function countMessages(msgs: ChatMessage[]) {
-  return msgs.reduce(
-    (pre, cur) => pre + estimateTokenLengthInLLM(getMessageTextContent(cur)),
-    0,
-  );
+  return msgs.reduce((pre, cur) => pre + estimateMessageTokenInLLM(cur), 0);
+}
+
+export function estimateMessageTokenInLLM(message: RequestMessage) {
+  if (typeof message.content === "string") {
+    return estimateTokenLengthInLLM(message.content);
+  }
+  let total_tokens = 0;
+  for (const c of message.content) {
+    if (c.type === "text" && c.text) {
+      total_tokens += estimateTokenLengthInLLM(c.text);
+    } else if (c.type === "file_url" && c.file_url?.url) {
+      total_tokens +=
+        c.file_url?.tokenCount || estimateTokenLengthInLLM(c.file_url?.url);
+    } else if (c.type === "image_url") {
+      // todo
+    }
+  }
+  return total_tokens;
 }
 
 function fillTemplateWith(input: string, modelConfig: ModelConfig) {
@@ -446,7 +461,7 @@ export const useChatStore = createPersistStore(
           }
           // 添加用户问题
           fileContent += userContent;
-          totalTokens += estimateTokenLengthInLLM(fileContent);
+          // totalTokens += estimateTokenLengthInLLM(fileContent);
 
           mContent = [
             {
@@ -498,6 +513,7 @@ export const useChatStore = createPersistStore(
               text: userContent,
             },
           ];
+          // totalTokens += estimateTokenLengthInLLM(userContent);
           mContent = mContent.concat(
             attachImages.map((url) => {
               return {
@@ -521,16 +537,20 @@ export const useChatStore = createPersistStore(
         } else {
           mContent = userContent;
           displayContent = userContent;
-          totalTokens = estimateTokenLengthInLLM(userContent);
+          // totalTokens = estimateTokenLengthInLLM(userContent);
         }
         let userMessage: ChatMessage = createMessage({
           role: "user",
           content: mContent,
           isContinuePrompt: isContinuePrompt,
           statistic: {
-            singlePromptTokens: totalTokens,
+            singlePromptTokens: totalTokens ?? 0,
           },
         });
+        if (userMessage.statistic) {
+          userMessage.statistic.singlePromptTokens =
+            estimateMessageTokenInLLM(userMessage);
+        }
 
         const botMessage: ChatMessage = createMessage({
           role: "assistant",
@@ -762,10 +782,10 @@ export const useChatStore = createPersistStore(
           }
           if (message.role === "assistant") {
             message.statistic.completionTokens =
-              estimateTokenLengthInLLM(newContent);
+              estimateMessageTokenInLLM(message);
           } else {
             message.statistic.singlePromptTokens =
-              estimateTokenLengthInLLM(newContent);
+              estimateMessageTokenInLLM(message);
           }
         }
         set(() => ({ sessions }));
@@ -974,6 +994,7 @@ export const useChatStore = createPersistStore(
       updateStat(message: ChatMessage) {
         get().updateCurrentSession((session) => {
           session.stat.charCount += message.content.length;
+          session.stat.tokenCount += estimateMessageTokenInLLM(message);
           // TODO: should update chat count and word count
         });
       },
@@ -991,7 +1012,41 @@ export const useChatStore = createPersistStore(
         const sessions = get().sessions;
         const index = sessions.findIndex((s) => s.id === targetSession.id);
         if (index < 0) return;
+        // Save message content before updates to compare later
+        const messagesBeforeUpdate = JSON.stringify(
+          sessions[index].messages.map((m) =>
+            typeof m.content === "string"
+              ? m.content
+              : getMessageTextContent(m),
+          ),
+        );
         updater(sessions[index]);
+        // Check if any message content has changed and update token stats
+        const updatedSession = sessions[index];
+        const messagesAfterUpdate = updatedSession.messages.map((m) =>
+          typeof m.content === "string" ? m.content : getMessageTextContent(m),
+        );
+        // Update token counts for any changed messages
+        const beforeMessages = JSON.parse(messagesBeforeUpdate);
+        updatedSession.messages.forEach((message, i) => {
+          if (
+            i < beforeMessages.length &&
+            messagesAfterUpdate[i] !== beforeMessages[i]
+          ) {
+            // Content changed, update token count
+            if (!message.statistic) {
+              message.statistic = {};
+            }
+
+            if (message.role === "assistant") {
+              message.statistic.completionTokens =
+                estimateMessageTokenInLLM(message);
+            } else {
+              message.statistic.singlePromptTokens =
+                estimateMessageTokenInLLM(message);
+            }
+          }
+        });
         set(() => ({ sessions }));
       },
       async clearAllChatData() {
