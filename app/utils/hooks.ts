@@ -1,6 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAccessStore, useAppConfig } from "../store";
-import { collectModels, collectModelsWithDefaultModel } from "./model";
+import { collectModelsWithDefaultModel } from "./model";
+import { safeLocalStorage } from "../utils";
+import { StoreKey } from "../constant";
+import { Model, userCustomProvider } from "../client/api";
 
 export function useAllModels() {
   const accessStore = useAccessStore();
@@ -19,4 +22,49 @@ export function useAllModels() {
   ]);
 
   return models;
+}
+
+// New hook that combines built-in models with custom provider models
+export function useAllModelsWithCustomProviders() {
+  const builtInModels = useAllModels();
+  const [customProviderModels, setCustomProviderModels] = useState<Model[]>([]);
+
+  // Load custom provider models from localStorage
+  useEffect(() => {
+    const storedProviders = safeLocalStorage().getItem(StoreKey.CustomProvider);
+    if (storedProviders) {
+      try {
+        const providers = JSON.parse(storedProviders) as userCustomProvider[];
+        // Only process active providers
+        const activeProviders = providers.filter((p) => p.status === "active");
+        // Extract selected models from each provider
+        const models = activeProviders.flatMap((provider) => {
+          return (provider.models || [])
+            .filter((model) => model.available)
+            .map((model) => ({
+              name: model.name,
+              available: true,
+              displayName: `${model.name}`,
+              provider: {
+                id: model.name,
+                providerName: provider.name,
+                providerType: "custom",
+                baseUrl: provider.baseUrl,
+                apiKey: provider.apiKey,
+              },
+              isCustom: true as const,
+            }));
+        });
+
+        setCustomProviderModels(models);
+      } catch (e) {
+        console.error("Failed to parse custom providers:", e);
+        setCustomProviderModels([]);
+      }
+    }
+  }, []);
+  // Combine built-in models with custom provider models
+  return useMemo(() => {
+    return [...customProviderModels, ...builtInModels];
+  }, [builtInModels, customProviderModels]);
 }
