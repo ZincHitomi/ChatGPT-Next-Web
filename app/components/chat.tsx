@@ -1143,7 +1143,7 @@ export function ChatActions(props: {
           icon={<PrivacyModeIcon />}
           onClick={() => {
             if (!session?.inPrivateMode) {
-              chatStore.newSession(undefined, true);
+              chatStore.newSession(session.mask, true);
               showToast(Locale.Chat.InputActions.PrivateMode.OnToast);
             } else {
               chatStore.deleteSession(chatStore.currentSessionIndex);
@@ -1163,6 +1163,7 @@ export function ChatActions(props: {
             items={models.map((m) => ({
               title:
                 m?.provider?.providerName?.toLowerCase() === "openai" ||
+                m?.provider?.providerType === "custom-provider" ||
                 m?.provider?.providerName === m.name
                   ? `${m.displayName}`
                   : `${m.displayName} (${m?.provider?.providerName})`,
@@ -1646,7 +1647,7 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
           session.messages[session.messages.length - 1].beClear = true;
         }
       }),
-    new: () => chatStore.newSession(),
+    new: () => chatStore.newSession(session.mask),
     search: () => navigate(Path.SearchChat),
     newm: () => navigate(Path.NewChat),
     prev: () => chatStore.nextSession(-1),
@@ -1656,7 +1657,7 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
     pin: () => chatStore.pinSession(chatStore.currentSessionIndex),
     private: () => {
       if (!chatStore.sessions[chatStore.currentSessionIndex]?.inPrivateMode) {
-        chatStore.newSession(undefined, true);
+        chatStore.newSession(session.mask, true);
         showToast(Locale.Chat.InputActions.PrivateMode.OnToast);
       } else {
         chatStore.deleteSession(chatStore.currentSessionIndex);
@@ -1779,6 +1780,7 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
   const formatModelItem = (model: Model) => ({
     title:
       model?.provider?.providerName?.toLowerCase() === "openai" ||
+      model?.provider?.providerType === "custom-provider" ||
       model?.provider?.providerName === model.name
         ? `${model.displayName || model.name}`
         : `${model.displayName || model.name} (${model?.provider
@@ -2562,7 +2564,7 @@ function ChatComponent({ modelTable }: { modelTable: Model[] }) {
       ) {
         event.preventDefault();
         setTimeout(() => {
-          chatStore.newSession();
+          chatStore.newSession(session.mask);
           navigate(Path.Chat);
         }, 10);
       }
@@ -3382,7 +3384,6 @@ export function Chat() {
   const chatStore = useChatStore();
   const session = chatStore.currentSession();
   const allModels = useAllModelsWithCustomProviders();
-  const hasUpdatedDisplayName = useRef(false);
 
   const modelTable = useMemo(() => {
     const filteredModels = allModels.filter((m) => m.available);
@@ -3402,7 +3403,6 @@ export function Chat() {
   useEffect(() => {
     // 仅在 session 最后一条消息 id 变化时执行，即有新的消息进入队列
 
-    let messagesChanged = false;
     for (let i = 0; i < session.messages.length; i++) {
       const message = session.messages[i];
       if (message.role !== "user" && !message.displayName && message.model) {

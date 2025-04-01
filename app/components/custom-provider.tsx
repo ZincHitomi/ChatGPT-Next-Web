@@ -184,9 +184,10 @@ function ProviderModal(props: {
     try {
       const accessStore = useAccessStore.getState();
       // 调用真实的API获取模型列表
+      const api_key = formData.apiKey.split(",")[0].trim();
       const modelsStr = await accessStore.fetchAvailableModels(
         formData.baseUrl,
-        formData.apiKey,
+        api_key,
       );
 
       // 解析API返回的模型数据
@@ -253,21 +254,50 @@ function ProviderModal(props: {
       return;
     }
 
-    // 创建新模型
-    const newModel: Model = {
-      name: searchModel,
-      available: true,
-      isDefault: false,
-      provider: {
-        id: searchModel,
-        providerName: searchModel,
-        providerType: searchModel,
-      },
-    };
+    // 支持逗号和换行符分割多个模型名称
+    const modelNames = searchModel
+      .split(/[,，\n]/)
+      .map((name) => name.trim())
+      .filter(Boolean);
 
-    // 更新模型列表并清空搜索
-    setModels([...models, newModel]);
-    setModelSearchTerm("");
+    // 处理每个模型名称
+    const newModels: Model[] = [];
+    const existingNames = new Set(models.map((m) => m.name));
+
+    for (const name of modelNames) {
+      if (existingNames.has(name)) {
+        continue; // 跳过已存在的模型
+      }
+
+      // 创建新模型
+      newModels.push({
+        name: name,
+        available: true,
+        isDefault: false,
+        provider: {
+          id: name,
+          providerName: name,
+          providerType: name,
+        },
+      });
+
+      existingNames.add(name);
+    }
+    if (newModels.length > 0) {
+      // 更新模型列表并清空搜索
+      setModels([...models, ...newModels]);
+      setModelSearchTerm("");
+    } else if (modelNames.length > 0) {
+      showToast(Locale.CustomProvider.ModelExists);
+    }
+  };
+
+  // 添加键盘事件处理
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      AddModels();
+    }
   };
 
   // 切换模型选中状态
@@ -287,9 +317,24 @@ function ProviderModal(props: {
 
   // 过滤模型列表
   const filteredModels = modelSearchTerm
-    ? models.filter((model) =>
-        model.name.toLowerCase().includes(modelSearchTerm.toLowerCase()),
-      )
+    ? models.filter((model) => {
+        const lowerName = model.name.toLowerCase();
+        const lowerSearchTerm = modelSearchTerm.toLowerCase();
+
+        // 首先尝试 includes() 匹配
+        if (lowerName.includes(lowerSearchTerm)) {
+          return true;
+        }
+
+        // 然后尝试正则匹配（安全地），正则不忽略大小写
+        try {
+          const regex = new RegExp(modelSearchTerm);
+          return regex.test(model.name);
+        } catch (e) {
+          // 如果正则表达式无效，则跳过正则匹配
+          return false;
+        }
+      })
     : models;
 
   return (
@@ -432,6 +477,7 @@ function ProviderModal(props: {
                 placeholder={Locale.CustomProvider.SearchModel}
                 className={styles.searchBar}
                 onChange={(e) => setModelSearchTerm(e.target.value)}
+                onKeyDown={handleKeyDown}
               />
               <div className={styles.actions}>
                 <IconButton
@@ -459,11 +505,28 @@ function ProviderModal(props: {
                 <IconButton
                   text={Locale.Select.Clear}
                   bordered
-                  onClick={() =>
-                    setModels(
-                      models.map((model) => ({ ...model, available: false })),
-                    )
-                  }
+                  onClick={() => {
+                    if (modelSearchTerm) {
+                      // 有搜索关键词时只清除筛选后的模型的选中状态
+                      const filteredModelNames = new Set(
+                        filteredModels.map((m) => m.name),
+                      );
+                      setModels(
+                        models.map((model) => ({
+                          ...model,
+                          available:
+                            model.available &&
+                            !filteredModelNames.has(model.name),
+                        })),
+                      );
+                      setModelSearchTerm("");
+                    } else {
+                      // 没有搜索关键词时清除所有模型的选中状态
+                      setModels(
+                        models.map((model) => ({ ...model, available: false })),
+                      );
+                    }
+                  }}
                 />
                 <IconButton
                   text={Locale.CustomProvider.RefreshModels}
