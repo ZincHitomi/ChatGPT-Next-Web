@@ -47,6 +47,10 @@ function ProviderModal(props: {
   const [models, setModels] = useState<Model[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelSearchTerm, setModelSearchTerm] = useState("");
+  const [editingModel, setEditingModel] = useState<Model | null>(null);
+  const [editedDisplayName, setEditedDisplayName] = useState("");
+  const [isJsonViewMode, setIsJsonViewMode] = useState(false);
+  const [displayNameMapText, setDisplayNameMapText] = useState("");
 
   // 当编辑现有提供商时，加载数据
   useEffect(() => {
@@ -77,6 +81,65 @@ function ProviderModal(props: {
       setModels([]);
     }
   }, [props.provider]);
+
+  const [rawInput, setRawInput] = useState("");
+  const parseRawInput = () => {
+    if (!rawInput.trim()) {
+      showToast("请输入需要解析的内容");
+      return;
+    }
+
+    // Initial data to be filled
+    let parsedName = "";
+    let parsedUrl = "";
+    let parsedApiKey = "";
+
+    // Extract name (first line is usually the name)
+    const lines = rawInput.split("\n");
+    if (lines.length > 0) {
+      parsedName = lines[0].trim();
+    }
+
+    // Extract URL with regex
+    const urlRegex = /(https?:\/\/[^\s]+)/i;
+    const urlMatch = rawInput.match(urlRegex);
+    if (urlMatch && urlMatch[1]) {
+      let url = urlMatch[1].trim();
+
+      // Process URL according to the rules
+      const urlObj = new URL(url);
+      const mainDomain = `${urlObj.protocol}//${urlObj.hostname}`;
+
+      // Check if it ends with 'completions' but is NOT 'v1/chat/completions'
+      if (url.endsWith("completions") && !url.endsWith("v1/chat/completions")) {
+        // For completions endpoints (not standard OpenAI path), add '#'
+        parsedUrl = url + "#";
+      } else {
+        // For all other cases, use just the main domain
+        parsedUrl = mainDomain;
+      }
+    }
+    // Extract API key with regex
+    const apiKeyRegex = /(sk-[^\s]+)/i;
+    const apiKeyMatch = rawInput.match(apiKeyRegex);
+    if (apiKeyMatch && apiKeyMatch[1]) {
+      parsedApiKey = apiKeyMatch[1].trim();
+    }
+
+    // Update form data
+    setFormData((prev) => ({
+      ...prev,
+      name: parsedName || prev.name,
+      baseUrl: parsedUrl || prev.baseUrl,
+      apiKey: parsedApiKey || prev.apiKey,
+    }));
+
+    // Clear the raw input area
+    // setRawInput("");
+
+    // Show success message
+    showToast("解析成功");
+  };
 
   // 添加切换供应商状态的函数
   const toggleProviderStatus = (id: string) => {
@@ -169,6 +232,7 @@ function ProviderModal(props: {
   const prevStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+      setIsJsonViewMode(false);
     }
   };
 
@@ -190,6 +254,15 @@ function ProviderModal(props: {
         api_key,
       );
 
+      // 创建一个现有模型的映射，用于保留displayName
+      const existingModelsMap = new Map();
+      models.forEach((model) => {
+        // 只保存有自定义displayName的模型
+        if (model.displayName) {
+          existingModelsMap.set(model.name, model.displayName);
+        }
+      });
+
       // 解析API返回的模型数据
       let fetchedModels: Model[] = [];
       if (modelsStr) {
@@ -202,6 +275,7 @@ function ProviderModal(props: {
           const [id, provider] = modelName.split("@");
           return {
             name: id,
+            displayName: existingModelsMap.get(id),
             available: false,
             isDefault: false,
             provider: {
@@ -223,9 +297,22 @@ function ProviderModal(props: {
         .filter((m) => m.available)
         .map((m) => m.name);
 
+      // 构建displayName映射
+      const displayNameMap = new Map();
+      formData.models?.forEach((model) => {
+        if (model.displayName) {
+          displayNameMap.set(model.name, model.displayName);
+        }
+      });
+
       setModels(
         fetchedModels.map((model) => ({
           ...model,
+          // 保留显示名称的优先级:
+          // 1. 从API获取的模型已有displayName
+          // 2. 从现有formData.models中获取displayName
+          // 3. 不设置displayName
+          displayName: model.displayName || displayNameMap.get(model.name),
           available: selectedModelNames.includes(model.name),
         })),
       );
@@ -299,6 +386,68 @@ function ProviderModal(props: {
       AddModels();
     }
   };
+  // 编辑模型显示名称的处理函数
+  const handleEditDisplayName = (model: Model, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingModel(model);
+    setEditedDisplayName(model.displayName || model.name);
+  };
+  // 保存显示名称
+  const saveDisplayName = () => {
+    if (!editingModel) return;
+
+    setModels(
+      models.map((model) =>
+        model.name === editingModel.name
+          ? { ...model, displayName: editedDisplayName.trim() || model.name }
+          : model,
+      ),
+    );
+
+    setEditingModel(null);
+  };
+  // 生成显示名称映射JSON字符串的函数
+  const generateDisplayNameMapView = () => {
+    const displayNameMap: Record<string, string> = {};
+    models.forEach((model) => {
+      if (model.displayName && model.displayName !== model.name) {
+        displayNameMap[model.name] = model.displayName;
+      }
+    });
+
+    return JSON.stringify(displayNameMap, null, 2);
+  };
+  // 解析并应用显示名称映射的函数
+  const applyDisplayNameMap = () => {
+    try {
+      const json = JSON.parse(displayNameMapText);
+
+      // 验证是否为有效的映射格式
+      if (typeof json !== "object" || json === null) {
+        throw new Error(Locale.CustomProvider.EditModel.ErrorJson);
+      }
+
+      // 应用映射到模型
+      setModels(
+        models.map((model) => ({
+          ...model,
+          displayName: json[model.name] || model.displayName || model.name,
+        })),
+      );
+
+      showToast(Locale.CustomProvider.EditModel.SuccessJson);
+      setIsJsonViewMode(false); // 应用后切回正常视图
+    } catch (error) {
+      console.error("解析JSON失败:", error);
+      showToast(Locale.CustomProvider.EditModel.ErrorJson);
+    }
+  };
+  // 在JSON视图模式切换时更新文本内容
+  useEffect(() => {
+    if (isJsonViewMode) {
+      setDisplayNameMapText(generateDisplayNameMapView());
+    }
+  }, [isJsonViewMode]);
 
   // 切换模型选中状态
   const toggleModelSelection = (modelName: string) => {
@@ -315,27 +464,29 @@ function ProviderModal(props: {
     );
   };
 
-  // 过滤模型列表
-  const filteredModels = modelSearchTerm
+  const sortedFilteredModels = modelSearchTerm
     ? models.filter((model) => {
         const lowerName = model.name.toLowerCase();
         const lowerSearchTerm = modelSearchTerm.toLowerCase();
-
         // 首先尝试 includes() 匹配
         if (lowerName.includes(lowerSearchTerm)) {
           return true;
         }
-
-        // 然后尝试正则匹配（安全地），正则不忽略大小写
+        // 然后尝试正则匹配
         try {
           const regex = new RegExp(modelSearchTerm);
           return regex.test(model.name);
         } catch (e) {
-          // 如果正则表达式无效，则跳过正则匹配
           return false;
         }
       })
     : models;
+  // 然后对结果进行排序，将available=true的模型排在前面
+  const filteredModels = sortedFilteredModels.sort((a, b) => {
+    if (a.available && !b.available) return -1;
+    if (!a.available && b.available) return 1;
+    return 0;
+  });
 
   return (
     <div className="modal-mask">
@@ -347,7 +498,7 @@ function ProviderModal(props: {
         }
         onClose={props.onClose}
         actions={[
-          currentStep > 1 && (
+          currentStep > 1 && !isJsonViewMode && (
             <IconButton
               key="prev"
               text={Locale.CustomProvider.Previous}
@@ -363,16 +514,43 @@ function ProviderModal(props: {
               bordered
             />
           ) : null,
-          <IconButton
-            key="save"
-            text={
-              props.provider
-                ? Locale.CustomProvider.SaveChanges
-                : Locale.CustomProvider.AddProvider
-            }
-            type="primary"
-            onClick={handleSubmit}
-          />,
+          currentStep === 2 && (
+            <IconButton
+              key="viewToggle"
+              text={
+                isJsonViewMode
+                  ? Locale.CustomProvider.EditModel.CardView
+                  : Locale.CustomProvider.EditModel.JsonView
+              }
+              onClick={() => setIsJsonViewMode(!isJsonViewMode)}
+              bordered
+            />
+          ),
+
+          // 在JSON视图模式下显示应用按钮
+          currentStep === 2 && isJsonViewMode && (
+            <IconButton
+              key="applyJson"
+              text={Locale.CustomProvider.EditModel.ApplyJson}
+              type="primary"
+              onClick={applyDisplayNameMap}
+              bordered
+            />
+          ),
+
+          // 保存按钮 - 在JSON视图模式下不显示
+          !isJsonViewMode && (
+            <IconButton
+              key="save"
+              text={
+                props.provider
+                  ? Locale.CustomProvider.SaveChanges
+                  : Locale.CustomProvider.AddProvider
+              }
+              type="primary"
+              onClick={handleSubmit}
+            />
+          ),
         ]}
       >
         <div className={styles.stepsContainer}>
@@ -465,6 +643,21 @@ function ProviderModal(props: {
                 />
               </ListItem>
             </>
+            <div className={styles.intelligentParsingContainer}>
+              <textarea
+                placeholder={Locale.CustomProvider.ParsingPlaceholder}
+                value={rawInput}
+                onChange={(e) => setRawInput(e.target.value)}
+                className={styles.parsingTextarea}
+              />
+              <div className={styles.parsingButtonContainer}>
+                <IconButton
+                  text={Locale.CustomProvider.IntelligentParsing}
+                  onClick={parseRawInput}
+                  type="primary"
+                />
+              </div>
+            </div>
           </List>
         )}
         {currentStep === 2 && (
@@ -549,6 +742,34 @@ function ProviderModal(props: {
                   <LoadingIcon />
                   <span>{Locale.CustomProvider.LoadingModels}</span>
                 </div>
+              ) : isJsonViewMode ? (
+                // JSON编辑视图 - 移除内部应用按钮
+                <div style={{ padding: "10px" }}>
+                  <div
+                    style={{
+                      marginBottom: "10px",
+                      fontSize: "14px",
+                      color: "#374151",
+                    }}
+                  >
+                    {Locale.CustomProvider.EditModel.EditJson}
+                  </div>
+                  <textarea
+                    value={displayNameMapText}
+                    onChange={(e) => setDisplayNameMapText(e.target.value)}
+                    style={{
+                      width: "100%",
+                      height: "250px",
+                      padding: "12px",
+                      borderRadius: "6px",
+                      border: "1px solid #e5e7eb",
+                      fontFamily: "monospace",
+                      fontSize: "14px",
+                      lineHeight: "1.5",
+                      resize: "vertical",
+                    }}
+                  />
+                </div>
               ) : filteredModels.length > 0 ? (
                 /* 模型网格 */
                 <div className={styles.modelGrid}>
@@ -560,11 +781,21 @@ function ProviderModal(props: {
                       }`}
                       onClick={() => toggleModelSelection(model.name)}
                     >
-                      <div
-                        className={styles.modelName}
-                        title={model.name} // 只添加title属性
-                      >
-                        {model.name}
+                      <div className={styles.modelContent}>
+                        <div
+                          className={styles.modelName}
+                          title={model.name} // 只添加title属性
+                        >
+                          {model.displayName || model.name}
+                        </div>
+                        {model.available && (
+                          <div
+                            className={styles.modelEditIcon}
+                            onClick={(e) => handleEditDisplayName(model, e)}
+                          >
+                            <EditIcon />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -579,6 +810,48 @@ function ProviderModal(props: {
           </div>
         )}
       </Modal>
+      {editingModel && (
+        <div className="modal-mask" style={{ zIndex: 2000 }}>
+          <div className={styles.editNameModal}>
+            <div className={styles.editNameHeader}>
+              <h3>{Locale.CustomProvider.EditModel.EditDisplayName}</h3>
+              <span
+                className={styles.closeButton}
+                onClick={() => setEditingModel(null)}
+              >
+                <CloseIcon />
+              </span>
+            </div>
+            <div className={styles.editNameContent}>
+              <div className={styles.editNameRow}>
+                <label>{Locale.CustomProvider.EditModel.ModelID}</label>
+                <div className={styles.modelIdText}>{editingModel.name}</div>
+              </div>
+              <div className={styles.editNameRow}>
+                <label>{Locale.CustomProvider.EditModel.DisplayName}</label>
+                <input
+                  type="text"
+                  value={editedDisplayName}
+                  onChange={(e) => setEditedDisplayName(e.target.value)}
+                  placeholder={editingModel.name}
+                  className={styles.displayNameInput}
+                />
+              </div>
+            </div>
+            <div className={styles.editNameFooter}>
+              <button
+                className={styles.cancelButton}
+                onClick={() => setEditingModel(null)}
+              >
+                {Locale.CustomProvider.EditModel.Cancel}
+              </button>
+              <button className={styles.saveButton} onClick={saveDisplayName}>
+                {Locale.CustomProvider.EditModel.Save}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

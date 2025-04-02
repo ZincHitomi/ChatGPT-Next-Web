@@ -825,6 +825,21 @@ const cn = {
     EmptyTitle: "暂无AI提供商",
     EmptyDescription: '点击"添加提供商"按钮来添加您的提供商',
     EmptySearchDescription: "尝试使用不同的搜索词或清除搜索",
+    ParsingPlaceholder: "输入请求样例或包含 api 信息的待解析文本",
+    IntelligentParsing: "智能解析",
+    EditModel: {
+      EditDisplayName: "编辑显示名称",
+      ModelID: "模型ID：",
+      DisplayName: "显示名称：",
+      Cancel: "取消",
+      Save: "保存",
+      ErrorJson: "无效的格式，请提供有效的JSON对象",
+      SuccessJson: "模型别名映射已成功应用",
+      CardView: "卡片视图",
+      JsonView: "JSON视图",
+      ApplyJson: "应用 JSON 映射",
+      EditJson: "编辑 JSON 映射, 格式：“模型: 模型别名” ",
+    },
   },
 };
 

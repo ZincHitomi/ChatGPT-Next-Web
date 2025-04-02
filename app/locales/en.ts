@@ -854,6 +854,22 @@ const en: LocaleType = {
     EmptyTitle: "No AI Providers",
     EmptyDescription: 'Click the "Add Provider" button to create one',
     EmptySearchDescription: "Try different keywords or clear search filters",
+    ParsingPlaceholder:
+      "Please provide a sample request or the text containing the API information you would like me to parse.",
+    IntelligentParsing: "IntelligentParsing",
+    EditModel: {
+      EditDisplayName: "Edit model's DisplayName",
+      ModelID: "Model ID: ",
+      DisplayName: "Display Name: ",
+      Cancel: "Cancel",
+      Save: "Save",
+      ErrorJson: "Invalid format. Please provide a valid JSON object.",
+      SuccessJson: "Model alias mapping has been successfully applied.",
+      CardView: "Card View",
+      JsonView: "JSON View",
+      ApplyJson: "Apply JSON Mapping",
+      EditJson: 'Edit JSON mapping (format: "Model: Model Alias")',
+    },
   },
   URLCommand: {
     Code: "Detected access code from url, confirm to apply? ",
