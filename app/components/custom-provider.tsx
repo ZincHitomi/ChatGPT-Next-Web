@@ -22,6 +22,7 @@ import TrashIcon from "../icons/delete.svg";
 import CloseIcon from "../icons/close.svg";
 import LoadingIcon from "../icons/loading.svg";
 import SearchIcon from "../icons/zoom.svg";
+import VisionIcon from "../icons/eye.svg";
 
 // 获取提供商类型标签
 const providerTypeLabels: Record<string, string> = {
@@ -45,16 +46,27 @@ const KeyItem = ({
   apiKey,
   baseUrl,
   type,
+  externalBalance,
+  externalLoading,
 }: {
   onDelete: (index: number) => void;
   index: number;
   apiKey: string;
   baseUrl: string;
   type: string;
+  externalBalance?: string | null;
+  externalLoading?: boolean;
 }) => {
   const accessStore = useAccessStore.getState();
   const [loading, setLoading] = useState(false);
   const [balance, setBalance] = useState<string | null>(null);
+
+  // 使用外部传入的余额覆盖本地状态
+  useEffect(() => {
+    if (externalBalance !== undefined) {
+      setBalance(externalBalance);
+    }
+  }, [externalBalance]);
 
   const checkBalance = async () => {
     setLoading(true);
@@ -92,7 +104,7 @@ const KeyItem = ({
       <div className={styles.keyActions}>
         {balance && <div className={styles.balanceDisplay}>{balance}</div>}
 
-        {!loading && !balance ? (
+        {!loading && !externalLoading && !balance ? (
           <IconButton
             icon={<SearchIcon />}
             text="$"
@@ -100,7 +112,7 @@ const KeyItem = ({
             onClick={checkBalance}
             title="查询余额"
           />
-        ) : loading ? (
+        ) : loading || externalLoading ? (
           <div style={{ width: "20px", height: "20px" }}>
             <LoadingIcon />
           </div>
@@ -146,6 +158,8 @@ function ProviderModal(props: {
   const [editedDisplayName, setEditedDisplayName] = useState("");
   const [isJsonViewMode, setIsJsonViewMode] = useState(false);
   const [displayNameMapText, setDisplayNameMapText] = useState("");
+  const [editedDescription, setEditedDescription] = useState("");
+  const [editedEnableVision, setEditedEnableVision] = useState(false);
   // API Key 列表视图状态
   const [isKeyListViewMode, setIsKeyListViewMode] = useState(false);
   const [keyList, setKeyList] = useState<string[]>([]);
@@ -307,6 +321,32 @@ function ProviderModal(props: {
     props.onSave(saveData);
   };
 
+  const handleClose = () => {
+    // // 如果在JSON视图模式下，先应用JSON更改
+    // if (isJsonViewMode) {
+    //   try {
+    //     const json = JSON.parse(displayNameMapText);
+    //     if (typeof json === "object" && json !== null) {
+    //       setModels(
+    //         models.map((model) => ({
+    //           ...model,
+    //           displayName: json[model.name] || model.displayName || model.name,
+    //         })),
+    //       );
+    //     }
+    //   } catch (e) {
+    //     // 如果JSON解析失败，忽略错误继续保存其他内容
+    //     console.error("JSON解析失败，忽略显示名称更改", e);
+    //   }
+    // }
+
+    // // 提交表单
+    // handleSubmit();
+
+    // 调用原始的onClose
+    props.onClose();
+  };
+
   const nextStep = () => {
     if (currentStep === 1) {
       if (!formData.name.trim()) {
@@ -405,15 +445,23 @@ function ProviderModal(props: {
         }
       });
 
-      let modelsToSet = fetchedModels.map((model) => ({
-        ...model,
-        // 保留显示名称的优先级:
-        // 1. 从API获取的模型已有displayName
-        // 2. 从现有formData.models中获取displayName
-        // 3. 不设置displayName
-        displayName: model.displayName || displayNameMap.get(model.name),
-        available: selectedModelNames.includes(model.name),
-      }));
+      let modelsToSet = fetchedModels.map((model) => {
+        const existingModel = formData.models?.find(
+          (m) => m.name === model.name,
+        );
+
+        return {
+          ...model,
+          // 保留显示名称的优先级:
+          // 1. 从API获取的模型已有displayName
+          // 2. 从现有formData.models中获取displayName
+          // 3. 不设置displayName
+          displayName: model.displayName || displayNameMap.get(model.name),
+          available: selectedModelNames.includes(model.name),
+          description: existingModel?.description || model?.description,
+          enableVision: existingModel?.enableVision || model?.enableVision,
+        };
+      });
       // 如果是在 step 2 且还没有进行过初始排序，则进行一次排序
       if (!initialSortDone) {
         modelsToSet = modelsToSet.sort((a, b) => {
@@ -509,6 +557,8 @@ function ProviderModal(props: {
     e.stopPropagation();
     setEditingModel(model);
     setEditedDisplayName(model.displayName || model.name);
+    setEditedDescription(model.description || "");
+    setEditedEnableVision(model.enableVision || false);
   };
   // 保存显示名称
   const saveDisplayName = () => {
@@ -517,7 +567,12 @@ function ProviderModal(props: {
     setModels(
       models.map((model) =>
         model.name === editingModel.name
-          ? { ...model, displayName: editedDisplayName.trim() || model.name }
+          ? {
+              ...model,
+              displayName: editedDisplayName.trim() || model.name,
+              description: editedDescription,
+              enableVision: editedEnableVision,
+            }
           : model,
       ),
     );
@@ -621,6 +676,13 @@ function ProviderModal(props: {
     }
   }, [props.provider]);
 
+  // 密钥额度状态
+  const [keyBalances, setKeyBalances] = useState<Record<string, string | null>>(
+    {},
+  );
+  const [loadingKeyBalances, setLoadingKeyBalances] = useState<
+    Record<string, boolean>
+  >({});
   // Update apiKey string when keyList changes
   useEffect(() => {
     const apiKeyString = keyList.join(",");
@@ -634,13 +696,22 @@ function ProviderModal(props: {
       return;
     }
 
-    // Check for duplicates
-    if (keyList.includes(newKey.trim())) {
-      showToast("This API Key already exists");
+    const keys = newKey
+      .split(/[\s,]+/) // 任何空白字符或逗号分割
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
+
+    if (keys.length === 0) {
+      showToast("API Key cannot be empty");
+      return;
+    }
+    const uniqueNewKeys = keys.filter((k) => !keyList.includes(k));
+    if (uniqueNewKeys.length === 0) {
+      showToast("All API Keys already exist");
       return;
     }
 
-    setKeyList([...keyList, newKey.trim()]);
+    setKeyList([...keyList, ...uniqueNewKeys]);
     setNewKey("");
   };
 
@@ -658,27 +729,236 @@ function ProviderModal(props: {
       addKeyToList();
     }
   };
+
+  const hasValidBalance = (balanceStr: string | null): boolean => {
+    if (!balanceStr) return false;
+
+    // 尝试提取数字部分 - 假设格式是"货币 数字"
+    const parts = balanceStr.split(" ");
+    if (parts.length < 2) return false;
+
+    // 获取最后一部分作为数字
+    const numberPart = parts[parts.length - 1];
+
+    // 尝试转换为浮点数
+    const balance = parseFloat(numberPart);
+
+    // 检查是否为有效数字且大于0
+    return !isNaN(balance) && balance > 0;
+  };
+
   const renderApiKeysSection = () => {
     if (isKeyListViewMode) {
       return (
         <div className={styles.keyListContainer}>
           <div className={styles.keyInputContainer}>
             <input
-              type="password"
+              type="text"
               value={newKey}
               onChange={(e) => setNewKey(e.target.value)}
               placeholder={Locale.CustomProvider.ApiKeyPlaceholder}
               className={styles.keyInput}
               onKeyDown={handleKeyInputKeyDown}
             />
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              marginBottom: "12px",
+              flexWrap: "wrap",
+            }}
+          >
             <IconButton
-              text="Add Key"
+              text={Locale.CustomProvider.AddKey}
               onClick={addKeyToList}
-              type="primary"
+              bordered
+            />
+            <IconButton
+              text={Locale.CustomProvider.ClearInput}
+              onClick={() => setNewKey("")}
+              bordered
+            />
+            <IconButton
+              text={Locale.CustomProvider.RefreshBalance}
+              onClick={async () => {
+                setKeyBalances({});
+                // 刷新所有Key的余额
+                const loadingState: Record<string, boolean> = {};
+                keyList.forEach((key) => {
+                  loadingState[key] = true;
+                });
+                setLoadingKeyBalances(loadingState);
+
+                // 并行查询所有key的余额
+                const promises = keyList.map(async (key) => {
+                  try {
+                    let result: any = null;
+                    if (formData.type === "siliconflow") {
+                      result = await useAccessStore
+                        .getState()
+                        .checkSiliconFlowBalance(key, formData.baseUrl);
+                    } else if (formData.type === "deepseek") {
+                      result = await useAccessStore
+                        .getState()
+                        .checkDeepSeekBalance(key, formData.baseUrl);
+                    } else if (
+                      formData.type === "openai" &&
+                      formData.baseUrl !==
+                        providerTypeDefaultUrls[formData.type]
+                    ) {
+                      result = await useAccessStore
+                        .getState()
+                        .checkCustomOpenaiBalance(key, formData.baseUrl);
+                    }
+
+                    // 更新该key的余额信息
+                    if (result && result.isValid && result.totalBalance) {
+                      setKeyBalances((prev) => ({
+                        ...prev,
+                        [key]: `${result.currency} ${result.totalBalance}`,
+                      }));
+                    } else {
+                      setKeyBalances((prev) => ({
+                        ...prev,
+                        [key]: null,
+                      }));
+                    }
+                  } catch (error) {
+                    setKeyBalances((prev) => ({
+                      ...prev,
+                      [key]: null,
+                    }));
+                  } finally {
+                    // 标记该key加载完成
+                    setLoadingKeyBalances((prev) => ({
+                      ...prev,
+                      [key]: false,
+                    }));
+                  }
+                });
+
+                await Promise.all(promises);
+                showToast("所有余额刷新完成");
+              }}
+              bordered
+            />
+            <IconButton
+              text={Locale.CustomProvider.RemoveInvalidKey}
+              onClick={async () => {
+                // 添加确认对话框
+                const confirmed = window.confirm(
+                  "此操作将会移除所有无法查询到余额的密钥。\n\n" +
+                    "• 包括API错误的密钥\n" +
+                    "• 包括余额为0或无效的密钥\n\n" +
+                    "此操作执行后无法撤回，是否继续？",
+                );
+
+                // 如果用户取消，则不执行后续操作
+                if (!confirmed) {
+                  return;
+                }
+                const validKeys: string[] = [];
+                const invalidKeys: string[] = [];
+                const reasons: Record<string, string> = {};
+
+                showToast("正在检查无效Key...");
+                for (let key of keyList) {
+                  // 检查是否已经有该key的余额信息
+                  if (key in keyBalances) {
+                    // 有余额显示的key被认为是有效的
+                    if (hasValidBalance(keyBalances[key])) {
+                      validKeys.push(key);
+                    } else {
+                      invalidKeys.push(key);
+                      reasons[key] = "缓存余额无效或为空";
+                    }
+                  } else {
+                    // 如果没有查询过余额，进行查询
+                    try {
+                      let result: any = null;
+                      if (formData.type === "siliconflow") {
+                        result = await useAccessStore
+                          .getState()
+                          .checkSiliconFlowBalance(key, formData.baseUrl);
+                      } else if (formData.type === "deepseek") {
+                        result = await useAccessStore
+                          .getState()
+                          .checkDeepSeekBalance(key, formData.baseUrl);
+                      } else if (
+                        formData.type === "openai" &&
+                        formData.baseUrl !==
+                          providerTypeDefaultUrls[formData.type]
+                      ) {
+                        result = await useAccessStore
+                          .getState()
+                          .checkCustomOpenaiBalance(key, formData.baseUrl);
+                      }
+
+                      // 更新余额缓存
+                      if (result && result.isValid && result.totalBalance) {
+                        // 尝试将余额转换为浮点数
+                        const balance = parseFloat(result.totalBalance);
+                        if (!isNaN(balance) && balance > 0) {
+                          validKeys.push(key);
+                          setKeyBalances((prev) => ({
+                            ...prev,
+                            [key]: `${result.currency} ${result.totalBalance}`,
+                          }));
+                        } else {
+                          invalidKeys.push(key);
+                          reasons[
+                            key
+                          ] = `余额为0或无效: ${result.totalBalance}`;
+                          setKeyBalances((prev) => ({
+                            ...prev,
+                            [key]: null,
+                          }));
+                        }
+                      } else {
+                        invalidKeys.push(key);
+                        reasons[key] = `API返回无效结果: ${
+                          result?.error || "未知错误"
+                        }`;
+                        setKeyBalances((prev) => ({
+                          ...prev,
+                          [key]: null,
+                        }));
+                      }
+                    } catch (error) {
+                      // 请求失败的key视为无效
+                      invalidKeys.push(key);
+                      reasons[key] = `API请求失败: ${
+                        error instanceof Error ? error.message : "未知错误"
+                      }`;
+                      setKeyBalances((prev) => ({
+                        ...prev,
+                        [key]: null,
+                      }));
+                    }
+                  }
+                }
+                console.log(
+                  "无效key列表及原因:",
+                  invalidKeys.map((k) => ({
+                    key: k,
+                    reason: reasons[k],
+                  })),
+                );
+                setKeyList(validKeys);
+                showToast("无效Key已移除");
+                // 显示结果
+                const removedCount = keyList.length - validKeys.length;
+                if (removedCount > 0) {
+                  showToast(`已移除 ${removedCount} 个无效Key`);
+                } else {
+                  showToast("没有发现无效Key");
+                }
+              }}
               bordered
             />
           </div>
-
           <div className={styles.keyListScroll}>
             {keyList.length === 0 ? (
               <div className={styles.emptyKeys}>
@@ -694,6 +974,8 @@ function ProviderModal(props: {
                     apiKey={key}
                     baseUrl={formData.baseUrl}
                     type={formData.type}
+                    externalBalance={keyBalances[key]}
+                    externalLoading={loadingKeyBalances[key]}
                   />
                 ))}
               </div>
@@ -900,7 +1182,7 @@ function ProviderModal(props: {
             ? Locale.CustomProvider.Edit
             : Locale.CustomProvider.AddProvider
         }
-        onClose={props.onClose}
+        onClose={handleClose}
         actions={[
           currentStep > 1 && !isJsonViewMode && (
             <IconButton
@@ -1234,6 +1516,9 @@ function ProviderModal(props: {
                             <span className={styles.testIcon}>Test</span>
                           )}
                         </div>
+                        {model?.enableVision && (
+                          <VisionIcon width="16" height="16" />
+                        )}
                         {model.available && (
                           <div
                             className={styles.modelEditButton}
@@ -1260,7 +1545,7 @@ function ProviderModal(props: {
         <div className="modal-mask" style={{ zIndex: 2000 }}>
           <div className={styles.editNameModal}>
             <div className={styles.editNameHeader}>
-              <h3>{Locale.CustomProvider.EditModel.EditDisplayName}</h3>
+              <h3>{Locale.CustomProvider.EditModel.EditModelFeature}</h3>
               <span
                 className={styles.closeButton}
                 onClick={() => setEditingModel(null)}
@@ -1282,6 +1567,34 @@ function ProviderModal(props: {
                   placeholder={editingModel.name}
                   className={styles.displayNameInput}
                 />
+              </div>
+              <div className={styles.editNameRow}>
+                <label>{Locale.CustomProvider.EditModel.Description}</label>
+                <input
+                  type="text"
+                  value={editedDescription}
+                  onChange={(e) => setEditedDescription(e.target.value)}
+                  placeholder="输入模型描述（可选）"
+                  className={styles.displayNameInput}
+                />
+              </div>
+              <div className={styles.editNameRow}>
+                <div className={styles.visionSupportRow}>
+                  <label>{Locale.CustomProvider.EditModel.VisionSupport}</label>
+                  <div className={styles.toggleContainer}>
+                    <div
+                      className={`${styles.toggleSwitch} ${
+                        editedEnableVision ? styles.active : ""
+                      }`}
+                      onClick={() => setEditedEnableVision(!editedEnableVision)}
+                    >
+                      <div className={styles.toggleSlider}></div>
+                    </div>
+                    <span className={styles.toggleLabel}>
+                      {editedEnableVision ? "已启用" : "未启用"}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
             <div className={styles.editNameFooter}>
