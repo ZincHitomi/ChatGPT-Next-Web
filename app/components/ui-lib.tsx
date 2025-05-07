@@ -446,7 +446,9 @@ export function showPrompt(content: any, value = "", rows = 3) {
 function ImageModalContent({ img }: { img: string }) {
   const [rotation, setRotation] = useState(0); // 旋转角度
   const [scale, setScale] = useState(1); // 缩放比例
+  const [isAdaptive, setIsAdaptive] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
 
   const handleRotateLeft = () => {
     setRotation((prev) => prev - 90); // 向左旋转 90 度
@@ -467,42 +469,94 @@ function ImageModalContent({ img }: { img: string }) {
   const handleResetToOriginal = () => {
     setScale(1);
     setRotation(0);
+    setIsAdaptive(false);
   };
+
+  const handleToggleAdaptive = () => {
+    if (!isAdaptive) {
+      fitImageToContainer(); // Apply adaptive scaling
+      setIsAdaptive(true);
+    }
+  };
+
+  const fitImageToContainer = useCallback(() => {
+    if (!containerRef.current || !imageRef.current) return;
+
+    const container = containerRef.current;
+    const image = imageRef.current;
+
+    // Get natural dimensions of image
+    const imgWidth = image.naturalWidth;
+    const imgHeight = image.naturalHeight;
+
+    // Get available space (accounting for padding)
+    const availWidth = container.clientWidth - 40; // 20px padding on each side
+    const availHeight = container.clientHeight - 40;
+
+    // Calculate required scale to fit
+    const scaleX = availWidth / imgWidth;
+    const scaleY = availHeight / imgHeight;
+    const newScale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 1:1
+
+    setScale(newScale);
+  }, []);
 
   const handleDownload = async () => {
     try {
-      // 使用 fetch 获取图片数据
-      const response = await fetch(img);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-
       // 生成带时间戳的文件名
       const timestamp = new Date()
         .toISOString()
         .replace(/:/g, "-")
         .replace(/\..+/, "")
         .replace("T", "_");
-      const fileExt = getFileExtension(img) || "jpg";
+      // 假设 img 是完整的 URL 字符串
+      const fileExt = getFileExtension(img) || "jpg"; // img 是你图片 URL 的变量
       const fileName = `image_${timestamp}.${fileExt}`;
 
       // 创建一个临时的下载链接
       const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
+      link.href = img; // 直接使用原始图片 URL
+      link.download = fileName; // 浏览器会尝试使用这个文件名
+
+      // 对于某些浏览器和服务器配置，可能需要设置 target="_blank" 来确保下载行为
+      // link.target = "_blank";
+      // link.rel = "noopener noreferrer"; // 安全考虑
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url); // 清理 URL 对象
     } catch (error) {
       console.error("Download failed:", error);
-      alert("Failed to download the image.");
+      alert(
+        "Failed to initiate download. The browser will handle the download. If it doesn't start, please check your browser settings or try right-clicking the image to save.",
+      );
     }
   };
 
+  // getFileExtension 函数保持不变
   const getFileExtension = (url: string): string | null => {
-    const match = url.match(/\.([a-zA-Z0-9]+)($|\?|#)/);
+    // 移除查询参数和哈希，以正确匹配扩展名
+    const pathname = new URL(url).pathname;
+    const match = pathname.match(/\.([a-zA-Z0-9]+)$/);
     return match ? match[1].toLowerCase() : null;
   };
+
+  useEffect(() => {
+    if (isAdaptive) {
+      fitImageToContainer();
+    }
+
+    const handleResize = () => {
+      if (isAdaptive) {
+        fitImageToContainer();
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [isAdaptive, fitImageToContainer]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -526,6 +580,7 @@ function ImageModalContent({ img }: { img: string }) {
       container.removeEventListener("wheel", preventScroll);
     };
   }, []);
+  const scalePercentage = Math.round(scale * 100);
 
   return (
     <div
@@ -552,6 +607,7 @@ function ImageModalContent({ img }: { img: string }) {
         // onWheel={handleWheel}
       >
         <img
+          ref={imageRef}
           src={img}
           alt="preview"
           style={{
@@ -559,6 +615,11 @@ function ImageModalContent({ img }: { img: string }) {
             transform: `rotate(${rotation}deg) scale(${scale})`,
             transformOrigin: "center",
             transition: "transform 0.3s ease",
+          }}
+          onLoad={() => {
+            if (isAdaptive) {
+              fitImageToContainer();
+            }
           }}
         />
       </div>
@@ -578,11 +639,42 @@ function ImageModalContent({ img }: { img: string }) {
         <div className={styles["image-buttons-container"]}>
           <button
             className={styles["image-button"]}
-            onClick={handleResetToOriginal}
-            title="Original Image"
+            onClick={handleZoomOut}
+            title="Zoom Out"
           >
-            1:1
+            ➖
           </button>
+          <span
+            className={styles["image-button"]}
+            style={{ cursor: "default" }}
+            title="Current Zoom Level"
+          >
+            {scalePercentage}%
+          </span>
+          <button
+            className={styles["image-button"]}
+            onClick={handleZoomIn}
+            title="Zoom In"
+          >
+            ➕
+          </button>
+          {!isAdaptive ? (
+            <button
+              className={styles["image-button"]}
+              onClick={handleToggleAdaptive}
+              title="Adaptive Scaling"
+            >
+              Fit
+            </button>
+          ) : (
+            <button
+              className={styles["image-button"]}
+              onClick={handleResetToOriginal}
+              title="Original Size"
+            >
+              1:1
+            </button>
+          )}
           <button
             className={styles["image-button"]}
             onClick={handleRotateLeft}
@@ -596,20 +688,6 @@ function ImageModalContent({ img }: { img: string }) {
             title="Rotate Right"
           >
             ↻
-          </button>
-          <button
-            className={styles["image-button"]}
-            onClick={handleZoomIn}
-            title="Zoom In"
-          >
-            ➕
-          </button>
-          <button
-            className={styles["image-button"]}
-            onClick={handleZoomOut}
-            title="Zoom Out"
-          >
-            ➖
           </button>
           <button
             className={styles["image-button"]}
