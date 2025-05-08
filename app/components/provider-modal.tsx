@@ -234,7 +234,7 @@ export function ProviderModal(props: ProviderModalProps) {
   const [editedDescription, setEditedDescription] = useState("");
   const [editedEnableVision, setEditedEnableVision] = useState(false);
   // API Key 列表视图状态
-  const [isKeyListViewMode, setIsKeyListViewMode] = useState(false);
+  const [isKeyListViewMode, setIsKeyListViewMode] = useState(true);
   const [keyList, setKeyList] = useState<string[]>([]);
   const [newKey, setNewKey] = useState("");
 
@@ -289,12 +289,7 @@ export function ProviderModal(props: ProviderModalProps) {
         status: "active",
         balance: undefined,
         testModel: providerTypeDefaultTestModel["openai"],
-        paths: {
-          ChatPath: "",
-          SpeechPath: "",
-          ImagePath: "",
-          ListModelPath: "",
-        },
+        paths: {},
       });
       setModels([]);
       setKeyList([]);
@@ -384,6 +379,7 @@ export function ProviderModal(props: ProviderModalProps) {
       status: (formData.status as "active" | "inactive") || "active",
       balance: formData.balance,
       testModel: formData.testModel,
+      paths: formData.paths,
     };
 
     props.onSave(saveData);
@@ -717,6 +713,7 @@ export function ProviderModal(props: ProviderModalProps) {
         status: props.provider.status || "active",
         balance: props.provider.balance,
         testModel: props.provider.testModel,
+        paths: props.provider.paths || {},
       });
       if (props.provider.models) {
         setModels(props.provider.models);
@@ -1172,7 +1169,7 @@ export function ProviderModal(props: ProviderModalProps) {
             <label className={styles.testModelLabel}>Test Model:</label>
             <input
               type="text"
-              value={formData.testModel}
+              value={formData.testModel ?? ""}
               onChange={(e) => {
                 handleChange("testModel", e.target.value);
               }}
@@ -1733,10 +1730,10 @@ export function ProviderModal(props: ProviderModalProps) {
                       type="text"
                       style={{ width: "300px" }}
                       value={formData.paths?.ChatPath || ""}
+                      placeholder="/v1/chat/completions"
                       onChange={(e) =>
                         handlePathChange("ChatPath", e.target.value)
                       }
-                      placeholder="/v1/chat/completions"
                     />
                   </ListItem>
 
@@ -1748,8 +1745,8 @@ export function ProviderModal(props: ProviderModalProps) {
                       type="text"
                       style={{ width: "300px" }}
                       value={formData.paths?.SpeechPath || ""}
-                      onChange={(e) => handlePathChange("SpeechPath", e.target.value)}
                       placeholder="/v1/audio/speech"
+                      onChange={(e) => handlePathChange("SpeechPath", e.target.value)}
                     />
                   </ListItem>
                   
@@ -1761,8 +1758,8 @@ export function ProviderModal(props: ProviderModalProps) {
                       type="text"
                       style={{ width: "300px" }}
                       value={formData.paths?.ImagePath || ""}
-                      onChange={(e) => handlePathChange("ImagePath", e.target.value)}
                       placeholder="/v1/images/generations"
+                      onChange={(e) => handlePathChange("ImagePath", e.target.value)}
                     />
                   </ListItem> */}
 
@@ -1774,10 +1771,10 @@ export function ProviderModal(props: ProviderModalProps) {
                       type="text"
                       style={{ width: "300px" }}
                       value={formData.paths?.ListModelPath || ""}
+                      placeholder="/v1/models"
                       onChange={(e) =>
                         handlePathChange("ListModelPath", e.target.value)
                       }
-                      placeholder="/v1/models"
                     />
                   </ListItem>
                 </>
